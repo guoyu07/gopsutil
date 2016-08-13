@@ -6,41 +6,60 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func TestVirtualMemoryDarwin(t *testing.T) {
 	v, err := VirtualMemory()
-	assert.Nil(t, err)
+	if err != Nil {
+		t.Fatalf("cannot get virtual memory: %s", err)
+	}
 
 	outBytes, err := invoke.Command("/usr/sbin/sysctl", "hw.memsize")
-	assert.Nil(t, err)
+	if err != nil {
+		t.Fatalf("cannot call sysctl: %s", err)
+	}
+
 	outString := string(outBytes)
 	outString = strings.TrimSpace(outString)
 	outParts := strings.Split(outString, " ")
 	actualTotal, err := strconv.ParseInt(outParts[1], 10, 64)
-	assert.Nil(t, err)
-	assert.Equal(t, uint64(actualTotal), v.Total)
+	if err != nil {
+		t.Errorf("cannot parse number: %s", err)
+	}
 
-	assert.True(t, v.Available > 0)
-	assert.Equal(t, v.Available, v.Free+v.Inactive, "%v", v)
+	if uint64(actualTotal) != v.Total {
+		t.Errorf("actual total %d != v.total %d", actualTotal, v.Total)
+	}
 
-	assert.True(t, v.Used > 0)
-	assert.True(t, v.Used < v.Total)
+	if v.Available < 0 {
+		t.Error("available virtual mem = 0")
+	}
 
-	assert.True(t, v.UsedPercent > 0)
-	assert.True(t, v.UsedPercent < 100)
+	if v.Available != v.Free+v.Inactive {
+		t.Error("available should be = free+inactive")
+	}
 
-	assert.True(t, v.Free > 0)
-	assert.True(t, v.Free < v.Available)
+	if v.Used < 0 || v.Used > v.Total {
+		t.Errorf("invalid used virtual mem: %d, total: %d", v.Used, v.Total)
+	}
 
-	assert.True(t, v.Active > 0)
-	assert.True(t, v.Active < v.Total)
+	if v.UsedPercent < 0 || v.UsedPercent > 100 {
+		t.Errorf("invalid used virtual mem %%: %d", v.UsedPercent)
+	}
 
-	assert.True(t, v.Inactive > 0)
-	assert.True(t, v.Inactive < v.Total)
+	if v.Free < 0 || v.Free > v.Available {
+		t.Errorf("invalid virtual mem free: %d, available: %d", v.Used, v.Available)
+	}
 
-	assert.True(t, v.Wired > 0)
-	assert.True(t, v.Wired < v.Total)
+	if v.Active < 0 || v.Active > v.Total {
+		t.Errorf("invalid used virtual mem active: %d, total: %d", v.Active, v.Total)
+	}
+
+	if v.Inactive <= 0 || v.Inactive > v.Total {
+		t.Errorf("invalid inactive virtual mem: %d, total: %d", v.Inactive, v.Total)
+	}
+
+	if v.Wired <= 0 || v.Wired > v.Total {
+		t.Errorf("invalid wired virtual mem: %d, total: %d", v.Wired, v.Total)
+	}
 }

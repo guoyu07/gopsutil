@@ -5,9 +5,9 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/shirou/gopsutil/cpu"
-	"github.com/shirou/gopsutil/internal/common"
-	"github.com/shirou/gopsutil/mem"
+	"github.com/percona/gopsutil/cpu"
+	"github.com/percona/gopsutil/internal/common"
+	"github.com/percona/gopsutil/mem"
 )
 
 var invoke common.Invoker
@@ -26,9 +26,9 @@ type Process struct {
 	gids           []int32
 	numThreads     int32
 	memInfo        *MemoryInfoStat
-
-	lastCPUTimes *cpu.TimesStat
-	lastCPUTime  time.Time
+	virtualMemInfo *VirtualMemoryStat
+	lastCPUTimes   *cpu.TimesStat
+	lastCPUTime    time.Time
 }
 
 type OpenFilesStat struct {
@@ -40,6 +40,22 @@ type MemoryInfoStat struct {
 	RSS  uint64 `json:"rss"`  // bytes
 	VMS  uint64 `json:"vms"`  // bytes
 	Swap uint64 `json:"swap"` // bytes
+}
+
+type VirtualMemoryStat struct {
+	VMPeak uint64 `json:"vmPeak"`
+	VMSize uint64 `json:"vmSize"`
+	VMLck  uint64 `json:"vmLck"`
+	VMPin  uint64 `json:"vmPin"`
+	VMHWM  uint64 `json:"vmHWM"`
+	VMRSS  uint64 `json:"vmRSS"`
+	VMData uint64 `json:"vmData"`
+	VMStk  uint64 `json:"vmStk"`
+	VMExe  uint64 `json:"vmExe"`
+	VMLib  uint64 `json:"vmLib"`
+	VMPTE  uint64 `json:"vmPTE"`
+	VMPMD  uint64 `json:"vmPMD"`
+	VMSwap uint64 `json:"vmSwap"`
 }
 
 type RlimitStat struct {

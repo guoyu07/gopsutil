@@ -1,28 +1,32 @@
 gopsutil: psutil for golang
 ==============================
 
-.. image:: https://circleci.com/gh/shirou/gopsutil.svg?&style=shield
-        :target: https://circleci.com/gh/shirou/gopsutil
+.. image:: https://circleci.com/gh/percona/gopsutil.svg?&style=shield
+        :target: https://circleci.com/gh/percona/gopsutil
 
-.. image:: https://coveralls.io/repos/shirou/gopsutil/badge.svg?branch=master
-        :target: https://coveralls.io/r/shirou/gopsutil?branch=master
+.. image:: https://coveralls.io/repos/percona/gopsutil/badge.svg?branch=master
+        :target: https://coveralls.io/r/percona/gopsutil?branch=master
 
-.. image:: https://godoc.org/github.com/shirou/gopsutil?status.svg
-        :target: http://godoc.org/github.com/shirou/gopsutil
+.. image:: https://godoc.org/github.com/percona/gopsutil?status.svg
+        :target: http://godoc.org/github.com/percona/gopsutil
 
+This is a fork of psutil (https://github.com/shirou/gopsutil) with:  
+- Virtual Memory information  
+- Removed testify dependency
+  
 This is a port of psutil (http://pythonhosted.org/psutil/). The challenge is porting all
 psutil functions on some architectures.
 
 
 .. highlights:: Breaking Changes!
 
-   Breaking changes is introduced at v2. See `issue 174 <https://github.com/shirou/gopsutil/issues/174>`_ .
+   Breaking changes is introduced at v2. See `issue 174 <https://github.com/percona/gopsutil/issues/174>`_ .
 
 
 Migrating to v2
 -------------------------
 
-On gopsutil itself, `v2migration.sh <https://github.com/shirou/gopsutil/blob/v2/v2migration.sh>`_ is used for migration. It can not be commonly used, but it may help you with migration.
+On gopsutil itself, `v2migration.sh <https://github.com/percona/gopsutil/blob/v2/v2migration.sh>`_ is used for migration. It can not be commonly used, but it may help you with migration.
 
 
 Available Architectures
@@ -48,7 +52,7 @@ Note: gopsutil v2 breaks compatibility. If you want to stay with compatibility, 
    import (
        "fmt"
 
-       "github.com/shirou/gopsutil/mem"
+       "github.com/percona/gopsutil/mem"
    )
 
    func main() {
@@ -77,7 +81,7 @@ You can set an alternative location to :code:`/etc` by setting the :code:`HOST_E
 Documentation
 ------------------------
 
-see http://godoc.org/github.com/shirou/gopsutil
+see http://godoc.org/github.com/percona/gopsutil
 
 Requirements
 -----------------

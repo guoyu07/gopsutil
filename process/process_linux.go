@@ -14,10 +14,10 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/shirou/gopsutil/cpu"
-	"github.com/shirou/gopsutil/host"
-	"github.com/shirou/gopsutil/internal/common"
-	"github.com/shirou/gopsutil/net"
+	"github.com/percona/gopsutil/cpu"
+	"github.com/percona/gopsutil/host"
+	"github.com/percona/gopsutil/internal/common"
+	"github.com/percona/gopsutil/net"
 )
 
 var ErrorNoChildren = errors.New("process does not have children")
@@ -600,6 +600,7 @@ func (p *Process) fillFromStatus() error {
 	lines := strings.Split(string(contents), "\n")
 	p.numCtxSwitches = &NumCtxSwitchesStat{}
 	p.memInfo = &MemoryInfoStat{}
+	p.virtualMemInfo = &VirtualMemoryStat{}
 	for _, line := range lines {
 		tabParts := strings.SplitN(line, "\t", 2)
 		if len(tabParts) < 2 {
@@ -660,6 +661,7 @@ func (p *Process) fillFromStatus() error {
 				return err
 			}
 			p.memInfo.RSS = v * 1024
+			p.virtualMemInfo.VMRSS = v * 1024
 		case "VmSize":
 			value := strings.Trim(value, " kB") // remove last "kB"
 			v, err := strconv.ParseUint(value, 10, 64)
@@ -667,6 +669,7 @@ func (p *Process) fillFromStatus() error {
 				return err
 			}
 			p.memInfo.VMS = v * 1024
+			p.virtualMemInfo.VMSize = v * 1024
 		case "VmSwap":
 			value := strings.Trim(value, " kB") // remove last "kB"
 			v, err := strconv.ParseUint(value, 10, 64)
@@ -674,6 +677,80 @@ func (p *Process) fillFromStatus() error {
 				return err
 			}
 			p.memInfo.Swap = v * 1024
+			//
+		case "VmPeak":
+			value := strings.Trim(value, " kB") // remove last "kB"
+			v, err := strconv.ParseUint(value, 10, 64)
+			if err != nil {
+				return err
+			}
+			p.virtualMemInfo.VMPeak = v * 1024
+		case "VmLck":
+			value := strings.Trim(value, " kB") // remove last "kB"
+			v, err := strconv.ParseUint(value, 10, 64)
+			if err != nil {
+				return err
+			}
+			p.virtualMemInfo.VMLck = v * 1024
+		case "VmPin":
+			value := strings.Trim(value, " kB") // remove last "kB"
+			v, err := strconv.ParseUint(value, 10, 64)
+			if err != nil {
+				return err
+			}
+			p.virtualMemInfo.VMPin = v * 1024
+		case "VmHWM":
+			value := strings.Trim(value, " kB") // remove last "kB"
+			v, err := strconv.ParseUint(value, 10, 64)
+			if err != nil {
+				return err
+			}
+			p.virtualMemInfo.VMHWM = v * 1024
+		case "VmData":
+			value := strings.Trim(value, " kB") // remove last "kB"
+			v, err := strconv.ParseUint(value, 10, 64)
+			if err != nil {
+				return err
+			}
+			p.virtualMemInfo.VMData = v * 1024
+		case "VmStk":
+			value := strings.Trim(value, " kB") // remove last "kB"
+			v, err := strconv.ParseUint(value, 10, 64)
+			if err != nil {
+				return err
+			}
+			p.virtualMemInfo.VMStk = v * 1024
+		case "VmExe":
+			value := strings.Trim(value, " kB") // remove last "kB"
+			v, err := strconv.ParseUint(value, 10, 64)
+			if err != nil {
+				return err
+			}
+			p.virtualMemInfo.VMExe = v * 1024
+		case "VmLib":
+			value := strings.Trim(value, " kB") // remove last "kB"
+			v, err := strconv.ParseUint(value, 10, 64)
+			if err != nil {
+				return err
+			}
+			p.virtualMemInfo.VMLib = v * 1024
+
+		case "VmPTE":
+			value := strings.Trim(value, " kB") // remove last "kB"
+			v, err := strconv.ParseUint(value, 10, 64)
+			if err != nil {
+				return err
+			}
+			p.virtualMemInfo.VMPTE = v * 1024
+
+		case "VmPMD":
+			value := strings.Trim(value, " kB") // remove last "kB"
+			v, err := strconv.ParseUint(value, 10, 64)
+			if err != nil {
+				return err
+			}
+			p.virtualMemInfo.VMPMD = v * 1024
+
 		}
 
 	}

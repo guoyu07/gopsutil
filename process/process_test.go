@@ -11,8 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/shirou/gopsutil/internal/common"
-	"github.com/stretchr/testify/assert"
+	"github.com/percona/gopsutil/internal/common"
 )
 
 var mu sync.Mutex
@@ -351,28 +350,35 @@ func Test_Username(t *testing.T) {
 
 	process, _ := NewProcess(int32(myPid))
 	pidUsername, _ := process.Username()
-	assert.Equal(t, myUsername, pidUsername)
+	if myUsername != pidUsername {
+		t.Errorf("usernames don't match. Got %s, expected: %s", pidUsername, myUsername)
+	}
 }
 
 func Test_CPUTimes(t *testing.T) {
 	pid := os.Getpid()
 	process, err := NewProcess(int32(pid))
-	assert.Nil(t, err)
+	if err != nil {
+		t.Errorf("cannot create process: %s", err)
+	}
 
 	spinSeconds := 0.2
 	cpuTimes0, err := process.Times()
-	assert.Nil(t, err)
+	if err != nil {
+		t.Errorf("error getting process Times(): %s", err)
+	}
 
 	// Spin for a duration of spinSeconds
 	t0 := time.Now()
 	tGoal := t0.Add(time.Duration(spinSeconds*1000) * time.Millisecond)
-	assert.Nil(t, err)
 	for time.Now().Before(tGoal) {
 		// This block intentionally left blank
 	}
 
 	cpuTimes1, err := process.Times()
-	assert.Nil(t, err)
+	if err != nil {
+		t.Errorf("error getting process Times(): %s", err)
+	}
 
 	if cpuTimes0 == nil || cpuTimes1 == nil {
 		t.FailNow()
@@ -380,21 +386,33 @@ func Test_CPUTimes(t *testing.T) {
 	measuredElapsed := cpuTimes1.Total() - cpuTimes0.Total()
 	message := fmt.Sprintf("Measured %fs != spun time of %fs\ncpuTimes0=%v\ncpuTimes1=%v",
 		measuredElapsed, spinSeconds, cpuTimes0, cpuTimes1)
-	assert.True(t, measuredElapsed > float64(spinSeconds)/5, message)
-	assert.True(t, measuredElapsed < float64(spinSeconds)*5, message)
+	if measuredElapsed <= float64(spinSeconds)/5 {
+		t.Error(message)
+	}
+	if measuredElapsed >= float64(spinSeconds)*5 {
+		t.Error(message)
+	}
 }
 
 func Test_OpenFiles(t *testing.T) {
 	pid := os.Getpid()
 	p, err := NewProcess(int32(pid))
-	assert.Nil(t, err)
+	if err != nil {
+		t.Errorf("cannot create process with id %d: %s", int32(pid), err)
+	}
 
 	v, err := p.OpenFiles()
-	assert.Nil(t, err)
-	assert.NotEmpty(t, v) // test always open files.
+	if err != nil {
+		t.Errorf("cannot open files: %s", err)
+	}
+	if len(v) == 0 {
+		t.Errorf("files list is empty")
+	}
 
 	for _, vv := range v {
-		assert.NotEqual(t, "", vv.Path)
+		if vv.Path == "" {
+			t.Error("invalid path in list (empty)")
+		}
 	}
 
 }

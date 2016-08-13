@@ -5,8 +5,7 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/shirou/gopsutil/internal/common"
-	"github.com/stretchr/testify/assert"
+	"github.com/percona/gopsutil/internal/common"
 )
 
 func TestGetProcInodesAll(t *testing.T) {
@@ -16,8 +15,12 @@ func TestGetProcInodesAll(t *testing.T) {
 
 	root := common.HostProc("")
 	v, err := getProcInodesAll(root)
-	assert.Nil(t, err)
-	assert.NotEmpty(t, v)
+	if err != nil {
+		t.Fatalf("cannot get process inodes: %s", err)
+	}
+	if len(v) == 0 {
+		t.Error("inodes list is empty")
+	}
 }
 
 type AddrTest struct {
@@ -27,7 +30,6 @@ type AddrTest struct {
 }
 
 func TestDecodeAddress(t *testing.T) {
-	assert := assert.New(t)
 
 	addr := map[string]AddrTest{
 		"0500000A:0016": AddrTest{
@@ -60,16 +62,31 @@ func TestDecodeAddress(t *testing.T) {
 		}
 		addr, err := decodeAddress(uint32(family), src)
 		if dst.Error {
-			assert.NotNil(err, src)
+			if err == nil {
+				t.Errorf("error decoding address: %s\nsrc:%#v", err, src)
+			}
 		} else {
-			assert.Nil(err, src)
-			assert.Equal(dst.IP, addr.IP, src)
-			assert.Equal(dst.Port, int(addr.Port), src)
+			if err != nil {
+				t.Errorf("error decoding address: %s\nsrc:%#v", err, src)
+			}
+			if dst.IP != addr.IP {
+				t.Errorf("IP addresses are different. %v != %v\nsrc: %#v", dst.IP, addr.IP, src)
+			}
+			if dst.Port != int(addr.Port) {
+				t.Errorf("ports don't match. %v != %v", dst.Port, addr.Port)
+			}
 		}
 	}
 }
 
 func TestReverse(t *testing.T) {
 	src := []byte{0x01, 0x02, 0x03}
-	assert.Equal(t, []byte{0x03, 0x02, 0x01}, Reverse(src))
+	expect := []byte{0x03, 0x02, 0x01}
+	got := Reverse(src)
+	for i := 0; i < len(expect); i++ {
+		if expect[i] != got[i] {
+			t.Errorf("reverse is wrong. Got: %v, expected: %v", got, expect)
+			break
+		}
+	}
 }

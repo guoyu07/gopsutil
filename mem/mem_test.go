@@ -3,8 +3,6 @@ package mem
 import (
 	"fmt"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func TestVirtual_memory(t *testing.T) {
@@ -17,20 +15,32 @@ func TestVirtual_memory(t *testing.T) {
 		t.Errorf("error %v", v)
 	}
 
-	assert.True(t, v.Total > 0)
-	assert.True(t, v.Available > 0)
-	assert.True(t, v.Used > 0)
+	if v.Total < 0 {
+		t.Error("total memory < 0")
+	}
+	if v.Available < 0 {
+		t.Error("available memory < 0")
+	}
+	if v.Used < 0 {
+		t.Error("used memory < 0")
+	}
 
-	assert.Equal(t, v.Total, v.Available+v.Used,
-		"Total should be computable from available + used: %v", v)
+	if v.Total != v.Available+v.Used {
+		t.Errorf("Total should be computable from available + used: %v", v)
+	}
 
-	assert.True(t, v.Free > 0)
-	assert.True(t, v.Available > v.Free,
-		"Free should be a subset of Available: %v", v)
+	if v.Free < 0 {
+		t.Error("free memory < 0")
+	}
+	if v.Free > v.Available {
+		t.Errorf("Free should be a subset of Available: %v", v)
+	}
 
-	assert.InDelta(t, v.UsedPercent,
-		100*float64(v.Used)/float64(v.Total), 0.1,
-		"UsedPercent should be how many percent of Total is Used: %v", v)
+	dt := v.UsedPercent - 100*float64(v.Used)/float64(v.Total)
+	delta := 0.1
+	if dt < -delta || dt > delta {
+		t.Errorf("UsedPercent should be how many percent of Total is Used: %v", v)
+	}
 }
 
 func TestSwap_memory(t *testing.T) {

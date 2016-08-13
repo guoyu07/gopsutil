@@ -10,7 +10,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/shirou/gopsutil/internal/common"
+	"github.com/percona/gopsutil/internal/common"
 )
 
 // POSIX
