@@ -3,7 +3,9 @@ package process
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"os/user"
+	"path"
 	"reflect"
 	"runtime"
 	"strings"
@@ -415,4 +417,78 @@ func Test_OpenFiles(t *testing.T) {
 		}
 	}
 
+}
+
+func TestFillFromStat(t *testing.T) {
+	out, err := exec.Command("git", "rev-parse", "--show-toplevel").Output()
+	if err != nil {
+		t.Error(err)
+	}
+	testDir := path.Join(strings.TrimSpace(string(out)), "test")
+	orgEnv := os.Getenv("HOST_PROC") // Save the current value
+
+	os.Setenv("HOST_PROC", testDir) // mockup the real /proc/pid/stat file location
+	p, err := NewProcess(4838)
+	if err != nil {
+		t.Error(err)
+	}
+	err = p.fillFromStat()
+	if err != nil {
+		t.Error(err)
+	}
+	expect := &ProcStat{
+		PID:            4838,
+		Name:           "skype",
+		State:          "S",
+		ParentPID:      4714,
+		ProcessGroupID: 4714,
+		SessionID:      4714,
+		TTY:            0,
+		ForegroundProcessGroupID: -1,
+		Flags:                   0x400000,
+		MinorPageFaults:         0xd52e,
+		ChildrenMinorPageFaults: 0x66,
+		MajorPageFaults:         0x2a8,
+		ChildreMajorPageFaults:  0x0,
+		UserTime:                0x294,
+		SystemTime:              0x151,
+		ChildrenUserTime:        0,
+		ChildrenKernelTime:      0,
+		Priority:                20,
+		Nice:                    0,
+		Threads:                 25,
+		ITRealValue:             0,
+		StartTime:               35,
+		VSize:                   0x29a12000,
+		RSS:                     45257,
+		RSSLim:                  "18446744073709551615",
+		StartCode:               0x56570000,
+		EndCode:                 0x58823b1e,
+		StartStack:              0xffafadb0,
+		KstkESP:                 0xffafa804,
+		KstkIP:                  0xf7768be9,
+		Signal:                  0x0,
+		WChan:                   0x0,
+		NSwap:                   0x0,
+		CNSwap:                  0x0,
+		ExitSignal:              17,
+		Processor:               2,
+		RTPriority:              0x0,
+		Policy:                  0x0,
+		DelayAcctBLKIOTicks:     0x49f,
+		GuestTime:               0x0,
+		ChildrenGuestTIme:       0x0,
+		StartData:               0x58824fcc,
+		EndData:                 0x588408a0,
+		StartBrk:                0x59701000,
+		ArgStart:                0xffafc6db,
+		ArgEnd:                  0xffafc6ea,
+		EnvStart:                0xffafc6ea,
+		EnvEnd:                  0xffafcfe9,
+		ExitCode:                0,
+	}
+	if !reflect.DeepEqual(*expect, *p.stats) {
+		t.Error("stat file parsing values error")
+	}
+	os.Setenv("HOST_PROC", orgEnv) // clean up
 }

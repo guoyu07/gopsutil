@@ -12,10 +12,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 
 	"github.com/percona/gopsutil/cpu"
-	"github.com/percona/gopsutil/host"
 	"github.com/percona/gopsutil/internal/common"
 	"github.com/percona/gopsutil/net"
 )
@@ -56,6 +54,61 @@ type MemoryMapsStat struct {
 	Swap         uint64 `json:"swap"`
 }
 
+type ProcStat struct {
+	PID                      int64   // 1
+	Name                     string  // 2
+	State                    string  // 3
+	ParentPID                int32   // 4
+	ProcessGroupID           int64   // 5
+	SessionID                int64   // 6
+	TTY                      int64   // 7
+	ForegroundProcessGroupID int64   // 8
+	Flags                    uint64  // 9
+	MinorPageFaults          uint64  // 10
+	ChildrenMinorPageFaults  uint64  // 11
+	MajorPageFaults          uint64  // 12
+	ChildreMajorPageFaults   uint64  // 13
+	UserTime                 float64 // 14
+	SystemTime               float64 // 15
+	ChildrenUserTime         float64 // 16
+	ChildrenKernelTime       float64 // 17
+	Priority                 int64   // 18
+	Nice                     int32   // 19
+	Threads                  int64   // 20
+	ITRealValue              int64
+	StartTime                int64
+	VSize                    uint64
+	RSS                      int64
+	RSSLim                   string //
+	StartCode                uint64
+	EndCode                  uint64
+	StartStack               uint64
+	KstkESP                  uint64
+	KstkIP                   uint64
+	Signal                   uint64
+	// Blocked                  uint64 obsolete
+	// SIGIgnore                uint64 obsolete
+	// SIGCatch                 uint64 obsolete
+	WChan               uint64
+	NSwap               uint64
+	CNSwap              uint64
+	ExitSignal          int32
+	Processor           int32
+	RTPriority          uint32
+	Policy              uint32
+	DelayAcctBLKIOTicks uint64
+	GuestTime           uint64
+	ChildrenGuestTIme   uint64
+	StartData           uint64
+	EndData             uint64
+	StartBrk            uint64
+	ArgStart            uint64
+	ArgEnd              uint64
+	EnvStart            uint64
+	EnvEnd              uint64
+	ExitCode            int32
+}
+
 // String returns JSON value of the process.
 func (m MemoryMapsStat) String() string {
 	s, _ := json.Marshal(m)
@@ -75,13 +128,21 @@ func NewProcess(pid int32) (*Process, error) {
 	return p, err
 }
 
+func (p *Process) GetStats() (*ProcStat, error) {
+	err := p.fillFromStat()
+	if err != nil {
+		return nil, err
+	}
+	return p.stats, nil
+}
+
 // Ppid returns Parent Process ID of the process.
 func (p *Process) Ppid() (int32, error) {
-	_, ppid, _, _, _, err := p.fillFromStat()
+	err := p.fillFromStat()
 	if err != nil {
 		return -1, err
 	}
-	return ppid, nil
+	return p.stats.ParentPID, nil
 }
 
 // Name returns name of the process.
@@ -113,11 +174,11 @@ func (p *Process) CmdlineSlice() ([]string, error) {
 
 // CreateTime returns created time of the process in seconds since the epoch, in UTC.
 func (p *Process) CreateTime() (int64, error) {
-	_, _, _, createTime, _, err := p.fillFromStat()
+	err := p.fillFromStat()
 	if err != nil {
 		return 0, err
 	}
-	return createTime, nil
+	return p.stats.StartTime, nil
 }
 
 // Cwd returns current working directory of the process.
@@ -169,22 +230,22 @@ func (p *Process) Gids() ([]int32, error) {
 }
 
 // Terminal returns a terminal which is associated with the process.
-func (p *Process) Terminal() (string, error) {
-	terminal, _, _, _, _, err := p.fillFromStat()
+func (p *Process) Terminal() (int64, error) {
+	err := p.fillFromStat()
 	if err != nil {
-		return "", err
+		return 0, err
 	}
-	return terminal, nil
+	return p.stats.TTY, nil
 }
 
 // Nice returns a nice value (priority).
 // Notice: gopsutil can not set nice value.
 func (p *Process) Nice() (int32, error) {
-	_, _, _, _, nice, err := p.fillFromStat()
+	err := p.fillFromStat()
 	if err != nil {
 		return 0, err
 	}
-	return nice, nil
+	return p.stats.Nice, nil
 }
 
 // IOnice returns process I/O nice value (priority).
@@ -236,9 +297,14 @@ func (p *Process) Threads() (map[string]string, error) {
 
 // Times returns CPU times of the process.
 func (p *Process) Times() (*cpu.TimesStat, error) {
-	_, _, cpuTimes, _, _, err := p.fillFromStat()
+	err := p.fillFromStat()
 	if err != nil {
 		return nil, err
+	}
+	cpuTimes := &cpu.TimesStat{
+		CPU:    "cpu",
+		User:   float64(p.stats.UserTime / ClockTicks),
+		System: float64(p.stats.SystemTime / ClockTicks),
 	}
 	return cpuTimes, nil
 }
@@ -589,8 +655,22 @@ func (p *Process) fillFromStatm() (*MemoryInfoStat, *MemoryInfoExStat, error) {
 	return memInfo, memInfoEx, nil
 }
 
+func (p *Process) VirtualMemoryInfo() (*VirtualMemoryStat, error) {
+	if p.virtualMemInfo == nil {
+		err := p.fillFromStat()
+		if err != nil {
+			return nil, err
+		}
+	}
+	return p.virtualMemInfo, nil
+}
+
 // Get various status from /proc/(pid)/status
 func (p *Process) fillFromStatus() error {
+	// If we already gathered the info, avoid opening/reading/closing the file again
+	if p.virtualMemInfo != nil {
+		return nil
+	}
 	pid := p.Pid
 	statPath := common.HostProc(strconv.Itoa(int(pid)), "status")
 	contents, err := ioutil.ReadFile(statPath)
@@ -757,64 +837,94 @@ func (p *Process) fillFromStatus() error {
 	return nil
 }
 
-func (p *Process) fillFromStat() (string, int32, *cpu.TimesStat, int64, int32, error) {
+func (p *Process) fillFromStat() error {
+	if p.stats != nil {
+		return nil
+	}
 	pid := p.Pid
+
 	statPath := common.HostProc(strconv.Itoa(int(pid)), "stat")
-	contents, err := ioutil.ReadFile(statPath)
+	inputFile, err := os.Open(statPath)
 	if err != nil {
-		return "", 0, nil, 0, 0, err
+		return err
 	}
-	fields := strings.Fields(string(contents))
-
-	i := 1
-	for !strings.HasSuffix(fields[i], ")") {
-		i++
+	if p.stats == nil {
+		p.stats = &ProcStat{}
 	}
-
-	termmap, err := getTerminalMap()
-	terminal := ""
-	if err == nil {
-		t, err := strconv.ParseUint(fields[i+5], 10, 64)
-		if err != nil {
-			return "", 0, nil, 0, 0, err
-		}
-		terminal = termmap[t]
-	}
-
-	ppid, err := strconv.ParseInt(fields[i+2], 10, 32)
+	var o1, o2, o3 uint64 // obsolete fields but we need to scan them
+	_, err = fmt.Fscanf(inputFile, "%d %s %s %d %d %d %d %d %d %d "+
+		"%d %d %d %f %f %f %f %d %d %d "+
+		"%d %d %d %d %s %d %d %d %d %d "+
+		"%d %d %d %d %d %d %d %d %d %d "+
+		"%d %d %d %d %d %d %d %d %d %d "+
+		"%d %d\n",
+		&p.stats.PID,
+		&p.stats.Name,
+		&p.stats.State,
+		&p.stats.ParentPID,
+		&p.stats.ProcessGroupID,
+		&p.stats.SessionID,
+		&p.stats.TTY,
+		&p.stats.ForegroundProcessGroupID,
+		&p.stats.Flags,
+		&p.stats.MinorPageFaults,
+		&p.stats.ChildrenMinorPageFaults,
+		&p.stats.MajorPageFaults,
+		&p.stats.ChildreMajorPageFaults,
+		&p.stats.UserTime,
+		&p.stats.SystemTime,
+		&p.stats.ChildrenUserTime,
+		&p.stats.ChildrenKernelTime,
+		&p.stats.Priority,
+		&p.stats.Nice,
+		&p.stats.Threads,
+		&p.stats.ITRealValue,
+		&p.stats.StartTime,
+		&p.stats.VSize,
+		&p.stats.RSS,
+		&p.stats.RSSLim,
+		&p.stats.StartCode,
+		&p.stats.EndCode,
+		&p.stats.StartStack,
+		&p.stats.KstkESP,
+		&p.stats.KstkIP,
+		&p.stats.Signal,
+		&o1,
+		&o2,
+		&o3,
+		&p.stats.WChan,
+		&p.stats.NSwap,
+		&p.stats.CNSwap,
+		&p.stats.ExitSignal,
+		&p.stats.Processor,
+		&p.stats.RTPriority,
+		&p.stats.Policy,
+		&p.stats.DelayAcctBLKIOTicks,
+		&p.stats.GuestTime,
+		&p.stats.ChildrenGuestTIme,
+		&p.stats.StartData,
+		&p.stats.EndData,
+		&p.stats.StartBrk,
+		&p.stats.ArgStart,
+		&p.stats.ArgEnd,
+		&p.stats.EnvStart,
+		&p.stats.EnvEnd,
+		&p.stats.ExitCode,
+	)
+	inputFile.Close()
 	if err != nil {
-		return "", 0, nil, 0, 0, err
-	}
-	utime, err := strconv.ParseFloat(fields[i+12], 64)
-	if err != nil {
-		return "", 0, nil, 0, 0, err
+		return err
 	}
 
-	stime, err := strconv.ParseFloat(fields[i+13], 64)
-	if err != nil {
-		return "", 0, nil, 0, 0, err
-	}
+	p.stats.UserTime /= ClockTicks
+	p.stats.SystemTime /= ClockTicks
+	p.stats.ChildrenUserTime /= ClockTicks
+	p.stats.ChildrenKernelTime /= ClockTicks
+	p.stats.StartTime /= ClockTicks
+	p.stats.Name = strings.TrimPrefix(p.stats.Name, "(")
+	p.stats.Name = strings.TrimSuffix(p.stats.Name, ")")
 
-	cpuTimes := &cpu.TimesStat{
-		CPU:    "cpu",
-		User:   float64(utime / ClockTicks),
-		System: float64(stime / ClockTicks),
-	}
-
-	bootTime, _ := host.BootTime()
-	t, err := strconv.ParseUint(fields[i+20], 10, 64)
-	if err != nil {
-		return "", 0, nil, 0, 0, err
-	}
-	ctime := (t / uint64(ClockTicks)) + uint64(bootTime)
-	createTime := int64(ctime * 1000)
-
-	//	p.Nice = mustParseInt32(fields[18])
-	// use syscall instead of parse Stat file
-	snice, _ := syscall.Getpriority(PrioProcess, int(pid))
-	nice := int32(snice) // FIXME: is this true?
-
-	return terminal, int32(ppid), cpuTimes, createTime, nice, nil
+	return nil
 }
 
 // Pids returns a slice of process ID list which are running now.

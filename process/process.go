@@ -29,6 +29,7 @@ type Process struct {
 	virtualMemInfo *VirtualMemoryStat
 	lastCPUTimes   *cpu.TimesStat
 	lastCPUTime    time.Time
+	stats          *ProcStat
 }
 
 type OpenFilesStat struct {
